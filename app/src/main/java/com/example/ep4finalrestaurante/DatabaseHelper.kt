@@ -183,4 +183,101 @@ class DatabaseHelper(context: Context) :
             false
         }
     }
+
+    // =====================================================
+    // PLATOS Y RECETA
+    // =====================================================
+
+    // READ: lista de platos
+    fun obtenerPlatos(): List<Plato> {
+        val lista = mutableListOf<Plato>()
+        val cursor = readableDatabase.rawQuery(
+            "SELECT id, nombre, precio FROM platos ORDER BY nombre",
+            null
+        )
+        cursor.use {
+            while (it.moveToNext()) {
+                lista.add(Plato(it.getInt(0), it.getString(1), it.getDouble(2)))
+            }
+        }
+        return lista
+    }
+
+    // READ: receta de un plato (JOIN con ingredientes para traer nombre y unidad)
+    fun obtenerReceta(platoId: Int): List<RecetaItem> {
+        val lista = mutableListOf<RecetaItem>()
+        val cursor = readableDatabase.rawQuery(
+            """
+            SELECT r.ingrediente_id, i.nombre, i.unidad, r.cantidad
+            FROM receta r
+            JOIN ingredientes i ON i.id = r.ingrediente_id
+            WHERE r.plato_id = ?
+            ORDER BY i.nombre
+            """.trimIndent(),
+            arrayOf(platoId.toString())
+        )
+        cursor.use {
+            while (it.moveToNext()) {
+                lista.add(
+                    RecetaItem(
+                        ingredienteId = it.getInt(0),
+                        ingredienteNombre = it.getString(1),
+                        unidad = it.getString(2),
+                        cantidad = it.getDouble(3)
+                    )
+                )
+            }
+        }
+        return lista
+    }
+
+    // CREATE / UPDATE: guarda el plato y su receta completa en una sola transacción.
+    // id = 0 -> plato nuevo; id > 0 -> actualiza el plato existente.
+    // Devuelve false si el nombre ya existe o algo falla (no queda nada a medias).
+    fun guardarPlato(id: Int, nombre: String, precio: Double, receta: List<RecetaItem>): Boolean {
+        val db = writableDatabase
+        db.beginTransaction()
+        return try {
+            val valores = ContentValues().apply {
+                put("nombre", nombre)
+                put("precio", precio)
+            }
+
+            val platoId: Long = if (id == 0) {
+                db.insertOrThrow("platos", null, valores)
+            } else {
+                val filas = db.update("platos", valores, "id = ?", arrayOf(id.toString()))
+                if (filas == 0) return false
+                id.toLong()
+            }
+
+            // La receta se reemplaza completa: se borra y se vuelve a insertar
+            db.delete("receta", "plato_id = ?", arrayOf(platoId.toString()))
+            for (item in receta) {
+                val fila = ContentValues().apply {
+                    put("plato_id", platoId)
+                    put("ingrediente_id", item.ingredienteId)
+                    put("cantidad", item.cantidad)
+                }
+                db.insertOrThrow("receta", null, fila)
+            }
+
+            db.setTransactionSuccessful()
+            true
+        } catch (e: SQLiteConstraintException) {
+            false
+        } finally {
+            db.endTransaction()
+        }
+    }
+
+    // DELETE: la receta se borra sola (ON DELETE CASCADE).
+    // Falla (false) si el plato ya aparece en ventas registradas.
+    fun eliminarPlato(id: Int): Boolean {
+        return try {
+            writableDatabase.delete("platos", "id = ?", arrayOf(id.toString())) > 0
+        } catch (e: SQLiteConstraintException) {
+            false
+        }
+    }
 }

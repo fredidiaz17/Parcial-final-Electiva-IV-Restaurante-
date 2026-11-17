@@ -25,6 +25,15 @@
             android:name=".IngredientesActivity"
             android:exported="false"
             android:parentActivityName=".MainActivity" />
+        <activity
+            android:name=".PlatosActivity"
+            android:exported="false"
+            android:parentActivityName=".MainActivity" />
+
+        <activity
+            android:name=".PlatoFormActivity"
+            android:exported="false"
+            android:parentActivityName=".PlatosActivity" />
     </application>
 
 </manifest>
