@@ -1,4 +1,4 @@
-package com.example.registroclientes
+package com.example.ep4finalrestaurante
 
 data class Compra(
     val id: Int,

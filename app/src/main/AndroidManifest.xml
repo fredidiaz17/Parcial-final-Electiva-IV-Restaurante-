@@ -34,6 +34,10 @@
             android:name=".PlatoFormActivity"
             android:exported="false"
             android:parentActivityName=".PlatosActivity" />
+        <activity
+            android:name=".ComprasActivity"
+            android:exported="false"
+            android:parentActivityName=".MainActivity" />
     </application>
 
 </manifest>

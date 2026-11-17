@@ -20,8 +20,11 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, PlatosActivity::class.java))
         }
 
+        findViewById<Button>(R.id.btnCompras).setOnClickListener {
+            startActivity(Intent(this, ComprasActivity::class.java))
+        }
+
         // Estos módulos se construyen en las siguientes fases
-        findViewById<Button>(R.id.btnCompras).setOnClickListener { proximamente() }
         findViewById<Button>(R.id.btnVentas).setOnClickListener { proximamente() }
         findViewById<Button>(R.id.btnReportes).setOnClickListener { proximamente() }
     }

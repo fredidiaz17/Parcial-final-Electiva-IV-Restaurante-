@@ -1,4 +1,4 @@
-package com.example.registroclientes
+package com.example.ep4finalrestaurante
 
 import java.util.Locale
 

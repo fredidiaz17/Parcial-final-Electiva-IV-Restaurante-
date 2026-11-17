@@ -2,9 +2,13 @@ package com.example.ep4finalrestaurante
 
 import android.content.ContentValues
 import android.content.Context
+import android.database.SQLException
 import android.database.sqlite.SQLiteConstraintException
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class DatabaseHelper(context: Context) :
     SQLiteOpenHelper(context, "RestauranteDB", null, 1) {
@@ -279,5 +283,69 @@ class DatabaseHelper(context: Context) :
         } catch (e: SQLiteConstraintException) {
             false
         }
+    }
+
+    // =====================================================
+    // COMPRAS
+    // =====================================================
+
+    private fun fechaActual(): String =
+        SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
+
+    // Registra la compra y suma la cantidad al stock, todo en una transacción:
+    // o se hacen las dos cosas, o ninguna.
+    fun registrarCompra(ingredienteId: Int, cantidad: Double, costoTotal: Double): Boolean {
+        val db = writableDatabase
+        db.beginTransaction()
+        return try {
+            val fila = ContentValues().apply {
+                put("ingrediente_id", ingredienteId)
+                put("cantidad", cantidad)
+                put("costo_total", costoTotal)
+                put("fecha", fechaActual())
+            }
+            db.insertOrThrow("compras", null, fila)
+
+            db.execSQL(
+                "UPDATE ingredientes SET stock_actual = stock_actual + ? WHERE id = ?",
+                arrayOf<Any>(cantidad, ingredienteId)
+            )
+
+            db.setTransactionSuccessful()
+            true
+        } catch (e: SQLException) {
+            false
+        } finally {
+            db.endTransaction()
+        }
+    }
+
+    // READ: historial, de la compra más reciente a la más antigua
+    fun obtenerCompras(): List<Compra> {
+        val lista = mutableListOf<Compra>()
+        val cursor = readableDatabase.rawQuery(
+            """
+            SELECT c.id, i.nombre, i.unidad, c.cantidad, c.costo_total, c.fecha
+            FROM compras c
+            JOIN ingredientes i ON i.id = c.ingrediente_id
+            ORDER BY c.id DESC
+            """.trimIndent(),
+            null
+        )
+        cursor.use {
+            while (it.moveToNext()) {
+                lista.add(
+                    Compra(
+                        id = it.getInt(0),
+                        ingredienteNombre = it.getString(1),
+                        unidad = it.getString(2),
+                        cantidad = it.getDouble(3),
+                        costoTotal = it.getDouble(4),
+                        fecha = it.getString(5)
+                    )
+                )
+            }
+        }
+        return lista
     }
 }
