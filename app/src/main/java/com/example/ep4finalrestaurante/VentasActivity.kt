@@ -1,4 +1,4 @@
-package com.example.registroclientes
+package com.example.ep4finalrestaurante
 
 import android.os.Bundle
 import android.view.View

@@ -1,4 +1,4 @@
-package com.example.registroclientes
+package com.example.ep4finalrestaurante
 
 import android.view.LayoutInflater
 import android.view.View

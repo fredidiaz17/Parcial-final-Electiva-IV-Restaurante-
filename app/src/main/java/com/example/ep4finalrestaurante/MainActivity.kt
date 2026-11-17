@@ -24,8 +24,11 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, ComprasActivity::class.java))
         }
 
-        // Estos módulos se construyen en las siguientes fases
-        findViewById<Button>(R.id.btnVentas).setOnClickListener { proximamente() }
+        findViewById<Button>(R.id.btnVentas).setOnClickListener {
+            startActivity(Intent(this, VentasActivity::class.java))
+        }
+
+        // Reportes se construye en la fase 5
         findViewById<Button>(R.id.btnReportes).setOnClickListener { proximamente() }
     }
 

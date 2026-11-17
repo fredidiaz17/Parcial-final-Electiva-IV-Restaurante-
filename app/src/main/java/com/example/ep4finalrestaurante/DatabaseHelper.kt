@@ -348,4 +348,89 @@ class DatabaseHelper(context: Context) :
         }
         return lista
     }
+
+    // =====================================================
+    // VENTAS
+    // =====================================================
+
+    // Registra una venta completa. Devuelve null si todo salió bien,
+    // o un mensaje de error (por ejemplo, qué ingredientes no alcanzan).
+    //
+    // Regla del proyecto: el stock se descuenta al registrar la venta,
+    // asumiendo que cada plato vendido se prepara de inmediato.
+    fun registrarVenta(items: List<ItemVenta>): String? {
+        if (items.isEmpty()) return "El carrito está vacío"
+
+        val db = writableDatabase
+        db.beginTransaction()
+        try {
+            // 1. Cuánto consume de cada ingrediente TODO el carrito junto
+            //    (si dos platos usan el mismo ingrediente, se suman)
+            val consumo = mutableMapOf<Int, Double>()
+            for (item in items) {
+                val receta = obtenerReceta(item.platoId)
+                if (receta.isEmpty()) return "El plato \"${item.nombre}\" no tiene receta"
+                for (r in receta) {
+                    consumo[r.ingredienteId] =
+                        (consumo[r.ingredienteId] ?: 0.0) + r.cantidad * item.cantidad
+                }
+            }
+
+            // 2. Validar que el stock alcance; se reportan TODOS los faltantes
+            val faltantes = mutableListOf<String>()
+            for ((ingredienteId, necesario) in consumo) {
+                db.rawQuery(
+                    "SELECT nombre, unidad, stock_actual FROM ingredientes WHERE id = ?",
+                    arrayOf(ingredienteId.toString())
+                ).use { c ->
+                    if (c.moveToFirst()) {
+                        val stock = c.getDouble(2)
+                        if (necesario > stock + 1e-9) {
+                            val nec = Math.round(necesario * 100) / 100.0
+                            faltantes.add(
+                                "• ${c.getString(0)}: necesita ${nec.formatoCantidad()} " +
+                                        "${c.getString(1)}, hay ${stock.formatoCantidad()}"
+                            )
+                        }
+                    }
+                }
+            }
+            if (faltantes.isNotEmpty()) {
+                return "Stock insuficiente:\n" + faltantes.joinToString("\n")
+            }
+
+            // 3. Guardar la venta y su detalle
+            val total = items.sumOf { it.subtotal }
+            val venta = ContentValues().apply {
+                put("fecha", fechaActual())
+                put("total", total)
+            }
+            val ventaId = db.insertOrThrow("ventas", null, venta)
+
+            for (item in items) {
+                val detalle = ContentValues().apply {
+                    put("venta_id", ventaId)
+                    put("plato_id", item.platoId)
+                    put("cantidad", item.cantidad)
+                    put("precio_unitario", item.precio) // precio al momento de la venta
+                }
+                db.insertOrThrow("detalle_venta", null, detalle)
+            }
+
+            // 4. Descontar el stock (ROUND evita residuos tipo 0.30000000000000004)
+            for ((ingredienteId, necesario) in consumo) {
+                db.execSQL(
+                    "UPDATE ingredientes SET stock_actual = ROUND(stock_actual - ?, 4) WHERE id = ?",
+                    arrayOf<Any>(necesario, ingredienteId)
+                )
+            }
+
+            db.setTransactionSuccessful()
+            return null
+        } catch (e: SQLException) {
+            return "No se pudo registrar la venta"
+        } finally {
+            db.endTransaction()
+        }
+    }
 }
